@@ -15,10 +15,12 @@
  */
 #include <Arduino.h>
 #include <AccelStepper.h>
+#include <DmxSimple.h>
+
 //Pin Setup
 const short endstopZ = 10;
 const short endstopX = 9;
-
+const short dmxPin = 8;
 const short stepDirX = 2;
 const short stepPinX = 3;
 const short stepTypeX = 1; //AccelStepper::DRIVER (1) means a stepper driver (with Step and Direction pins).
@@ -47,6 +49,7 @@ boolean homedX = false;
 void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋업
 {
   Serial.begin(9600);
+  DmxSimple.usePin(dmxPin);
   pinMode(endstopX,INPUT_PULLUP);
   delay(5);
      stepperX.setAcceleration(100);
@@ -175,22 +178,31 @@ void loop()
  if(calibration == true){
    calibrateTravel();
  } else {
+   delay(100);
+
+   delay(100);
+
+
    moveTo(patternZ[patternPosZ][0], patternZ[patternPosZ][1], patternZ[patternPosZ][2], patternZ[patternPosZ][3]);
    moveTo(patternX[patternPosX][0], patternX[patternPosX][1], patternX[patternPosX][2], patternX[patternPosX][3]);
    if(stepperZ.distanceToGo() == 0){
      if(patternPosZ < 3){
        patternPosZ ++;
+       DmxSimple.write(5, 255);
      } else {
        //TODO:add call to homing function here
        patternPosZ = 0;
+       DmxSimple.write(5, 0);
      }
     }
     if(stepperX.distanceToGo() == 0){
       if(patternPosX < 3){ //length of pattern -1
         patternPosX ++;
+        DmxSimple.write(6, 255);
       } else {
         //TODO:add call to homing function here
         patternPosX = 0;
+        DmxSimple.write(6, 0);
       }
      }
      stepperX.run();
