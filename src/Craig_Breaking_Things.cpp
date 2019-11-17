@@ -30,15 +30,16 @@ AccelStepper stepperX(stepTypeX,stepPinX,stepDirX); //스테퍼 구동방식-1�
 AccelStepper stepperZ(stepTypeZ,stepPinZ,stepDirZ);
 
 const int maxTravelX = 4500;
-const int maxTravelZ = 50;
+const int maxTravelZ = 800;
 
-unsigned int posX, posY;
+unsigned int posX, posZ;
 
 unsigned long time;
 long TravelX;
 int move_finished=1;
 long inital_homing=-1;
 int dur;
+boolean homedX = false;
 
 void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋업
 {
@@ -52,7 +53,7 @@ void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋
     stepperX.moveTo(inital_homing);
     inital_homing--;
     stepperX.run();
-    Serial.print("Homing... ");
+    Serial.print("HomingX... ");
     Serial.println(inital_homing);
     delay(5);
    }
@@ -62,8 +63,29 @@ void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋
   stepperX.setMaxSpeed(400);
   stepperX.setAcceleration(150);
 
-  inital_homing = 1;
-  Serial.println("Homing... Complete!");
+
+  Serial.println("HomingX... Complete!");
+
+  inital_homing = -1;
+  pinMode(endstopZ,INPUT_PULLUP);
+  delay(5);
+   stepperZ.setAcceleration(100);
+   stepperZ.setMaxSpeed(100);
+
+   while (digitalRead(endstopZ)){
+    stepperZ.moveTo(inital_homing);
+    inital_homing--;
+    stepperZ.run();
+    Serial.print("HomingZ... ");
+    Serial.println(inital_homing);
+    delay(5);
+   }
+
+  stepperZ.setCurrentPosition(0);
+  posZ = 0;
+  stepperZ.setMaxSpeed(100);
+  stepperZ.setAcceleration(100);
+  Serial.println("HomingZ... Complete!");
   delay(2000);
 
   /*
@@ -85,22 +107,43 @@ void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋
 
 void loop()
 {
+if(homedX == false){
+  stepperX.run();
+}
 
-stepperX.run();
 
-if(stepperX.distanceToGo() == 0){
+if(stepperX.distanceToGo() == 0 && homedX == false){
   stepperX.moveTo(posX + 500);
   posX += 500;
 }
 
-Serial.println(posX);
+Serial.print("PosX = ");
+Serial.print(posX);
+Serial.print("  PosZ = ");
+Serial.println(posZ);
 
-if(digitalRead(endstopX) == 0){
-  Serial.println("HALTING!");
+if(digitalRead(endstopX) == 0 && homedX == false){
+  homedX = true;
+  Serial.print("HALTING! -- ");
   Serial.println(posX);
-  while(true){
+}
 
+if(homedX == true){
+
+  stepperZ.run();
+}
+  if(stepperZ.distanceToGo() == 0 && homedX == true){
+    stepperZ.moveTo(posZ + 100);
+    posZ += 100;
   }
+  if(digitalRead(endstopZ) == 0 && homedX == true){
+    Serial.println("HALTING! Z --- END ");
+    Serial.println(posZ);
+    while(true){
+
+    }
+
+
 }
 
 /*
