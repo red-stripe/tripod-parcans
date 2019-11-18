@@ -1,43 +1,36 @@
-// ConstantSpeed.pde
-// -*- mode: C++ -*-
-//
-// Shows how to run AccelStepper in the simplest,
-// fixed speed mode with no accelerations
-/// \author  Mike McCauley (mikem@open.com.au)
-// Copyright (C) 2009 Mike McCauley
-// $Id: HRFMessage.h,v 1.1 2009/08/15 05:32:58 mikem Exp mikem $
-
 /*
- * Hi, This is some test code.
- * Limit switches are DISABLED!
- * Please start the lights in 'neutral position'
- *
- */
+Made by:
+
+Built using:
+https://github.com/PaulStoffregen/DmxSimple
+https://github.com/waspinator/AccelStepper
+https://platformio.org
+https://atom.io/
+
+Licenced under:
+MIT
+*/
 #include <Arduino.h>
 #include <AccelStepper.h>
 #include <DmxSimple.h>
+#include "config.h"
+#include "patterns.h"
 
-//Pin Setup
-const short endstopZ = 10;
-const short endstopX = 9;
-const short dmxPin = 8;
-const short stepDirX = 2;
-const short stepPinX = 3;
-const short stepTypeX = 1; //AccelStepper::DRIVER (1) means a stepper driver (with Step and Direction pins).
-const short stepDirZ = 4;
-const short stepPinZ = 5;
-const short stepTypeZ = 1;
+
 
 AccelStepper stepperX(stepTypeX,stepPinX,stepDirX); //스테퍼 구동방식-1은 step/dir으로 움직이는 방식, step pin , direction pin
 AccelStepper stepperZ(stepTypeZ,stepPinZ,stepDirZ);
 
+//Config Settings
+//Max steps to travel from home position
 const int maxTravelX = 4500;
 const int maxTravelZ = 1000; //900 steps = 180 degrees
 
-const boolean calibration = false;
+const boolean calibration = true;
 
 unsigned int posX, posZ;
 unsigned short patternPosZ, patternPosX = 0;
+const int dmxChannels = 6;
 
 unsigned long time;
 long TravelX;
@@ -49,6 +42,7 @@ boolean homedX = false;
 void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋업
 {
   Serial.begin(9600);
+  DmxSimple.maxChannel(dmxChannels);
   DmxSimple.usePin(dmxPin);
   pinMode(endstopX,INPUT_PULLUP);
   delay(5);
@@ -123,8 +117,6 @@ void moveTo(short motorID, int speed, int acceleration, int targetPosition){
 }
 }
 
-
-
 void calibrateTravel(){
   if(homedX == false){
     stepperX.run();
@@ -166,47 +158,108 @@ void calibrateTravel(){
 
 }
 
+short dmxQue[][3] = { //[channel][current, target]
+                      {1,0,0}, //Red
+                      {2,0,0}, //Green
+                      {3,0,0}, //Blue
+                      {4,0,0}, // Yellow
+                      {5,0,0}, // Spooky Orange
+                      {6,0,0} // UV
+};
+
+void dmxTarget(short channel, short value){
+
+  switch(channel) {
+    case 1:
+      dmxQue[0][2] = value;
+      break;
+    case 2:
+      dmxQue[1][2] = value;
+      break;
+    case 3:
+      dmxQue[2][2] = value;
+      break;
+    case 4:
+      dmxQue[3][2] = value;
+      break;
+    case 5:
+      dmxQue[4][2] = value;
+      break;
+    case 6:
+      dmxQue[5][2] = value;
+      break;
+    default:
+      // somethings gone wrong
+      break;
+  }
+
+}
+
+void dmxUpdate(){
+  for(short channelRefresh = 1; channelRefresh < dmxChannels; channelRefresh++){
+    if(dmxQue[channelRefresh][1] != dmxQue[channelRefresh][2]){
+      if(dmxQue[channelRefresh][1] < dmxQue[channelRefresh][2]){
+        dmxQue[channelRefresh][1] --;
+      } else {
+        dmxQue[channelRefresh][1] ++;
+      }
+      DmxSimple.write(dmxQue[channelRefresh][0], dmxQue[channelRefresh][1]);
+    }
+  }
+
+
+}
+
 int patternZ[][4] = { // speed, acceleration, position
                     {2,180, 50, maxTravelZ}, {2,120, 80, 0}, {2, 50, 50, maxTravelZ/2}, {2, 180, 80, 20}
                   };
 int patternX[][4] = { // speed, acceleration, position
-                    {1, 180, 50, maxTravelX}, {1, 120, 80, 0}, {1, 50, 50, maxTravelX/2}, {1, 180, 80, 20}
+                    {1, 80, 50, maxTravelX}, {1, 40, 80, 0}, {1, 50, 50, maxTravelX/2}, {1, 180, 80, 20}
                   };
+
+// TODO: fade with acceleration
+// TODO: Dwell at end of travel
 
 void loop()
 {
  if(calibration == true){
    calibrateTravel();
  } else {
-   delay(100);
-
-   delay(100);
-
 
    moveTo(patternZ[patternPosZ][0], patternZ[patternPosZ][1], patternZ[patternPosZ][2], patternZ[patternPosZ][3]);
-   moveTo(patternX[patternPosX][0], patternX[patternPosX][1], patternX[patternPosX][2], patternX[patternPosX][3]);
+//   moveTo(patternX[patternPosX][0], patternX[patternPosX][1], patternX[patternPosX][2], patternX[patternPosX][3]);
    if(stepperZ.distanceToGo() == 0){
      if(patternPosZ < 3){
        patternPosZ ++;
-       DmxSimple.write(5, 255);
      } else {
        //TODO:add call to homing function here
        patternPosZ = 0;
-       DmxSimple.write(5, 0);
      }
     }
     if(stepperX.distanceToGo() == 0){
       if(patternPosX < 3){ //length of pattern -1
         patternPosX ++;
-        DmxSimple.write(6, 255);
       } else {
         //TODO:add call to homing function here
         patternPosX = 0;
-        DmxSimple.write(6, 0);
       }
      }
      stepperX.run();
      stepperZ.run();
+
+     if(stepperZ.distanceToGo() < 90){
+       dmxUpdate();
+       dmxTarget(1,255);
+       dmxTarget(2,255);
+       dmxTarget(3,255);
+       dmxTarget(6,0);
+     } else {
+       dmxUpdate();
+       dmxTarget(1,0);
+       dmxTarget(2,0);
+       dmxTarget(3,0);
+       dmxTarget(6,255);
+     }
      /*
      stepperX.runToNewPosition(1000); //포지션 1000으로 이동 - 정확히 단위는 모르겠음
      stepperX.setAcceleration(0.1);  //아주 천천히 가속하도록 해서 멈추는 효과를 줌 소수점도 가능
