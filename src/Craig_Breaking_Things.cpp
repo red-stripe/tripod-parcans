@@ -23,10 +23,10 @@ AccelStepper stepperZ(stepTypeZ,stepPinZ,stepDirZ);
 
 //Config Settings
 //Max steps to travel from home position
-const int maxTravelX = 4500;
-const int maxTravelZ = 1000; //900 steps = 180 degrees
+const int maxTravelX = 2800;
+const int maxTravelZ = 800; //900 steps = 180 degrees
 
-const boolean calibration = true;
+const boolean calibration = false;
 
 unsigned int posX, posZ;
 unsigned short patternPosZ, patternPosX = 0;
@@ -42,8 +42,9 @@ boolean homedX = false;
 void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋업
 {
   Serial.begin(9600);
-  DmxSimple.maxChannel(dmxChannels);
+//  DmxSimple.maxChannel(dmxChannels);
   DmxSimple.usePin(dmxPin);
+  DmxSimple.write(1, 255);
   pinMode(endstopX,INPUT_PULLUP);
   delay(5);
      stepperX.setAcceleration(100);
@@ -101,7 +102,7 @@ void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋
 
   delay(1000);
   */
-
+  DmxSimple.write(1, 0);
 }
 
 void moveTo(short motorID, int speed, int acceleration, int targetPosition){
@@ -109,12 +110,12 @@ void moveTo(short motorID, int speed, int acceleration, int targetPosition){
    stepperX.moveTo(targetPosition); // moveTo로 움직이면 나머지 컨트롤이 잘 안돼서 안씀
    stepperX.setMaxSpeed(speed); //천천히 움직이려면 200보다 느려도 됨, max2000
    stepperX.setAcceleration(acceleration);
- }
+  }
  if(motorID == 2){
   stepperZ.moveTo(targetPosition); // moveTo로 움직이면 나머지 컨트롤이 잘 안돼서 안씀
   stepperZ.setMaxSpeed(speed); //천천히 움직이려면 200보다 느려도 됨, max2000
   stepperZ.setAcceleration(acceleration);
-}
+  }
 }
 
 void calibrateTravel(){
@@ -196,14 +197,18 @@ void dmxTarget(short channel, short value){
 }
 
 void dmxUpdate(){
-  for(short channelRefresh = 1; channelRefresh < dmxChannels; channelRefresh++){
+  for(short channelRefresh = 0; channelRefresh < dmxChannels; channelRefresh++){
     if(dmxQue[channelRefresh][1] != dmxQue[channelRefresh][2]){
-      if(dmxQue[channelRefresh][1] < dmxQue[channelRefresh][2]){
+      if(dmxQue[channelRefresh][1] > dmxQue[channelRefresh][2]){
         dmxQue[channelRefresh][1] --;
       } else {
         dmxQue[channelRefresh][1] ++;
       }
       DmxSimple.write(dmxQue[channelRefresh][0], dmxQue[channelRefresh][1]);
+  //    Serial.print("\t dmxUPdate - C:");
+  //    Serial.print(dmxQue[channelRefresh][0]);
+  //    Serial.print(" \t V:");
+  //    Serial.println(dmxQue[channelRefresh][1]);
     }
   }
 
@@ -211,23 +216,36 @@ void dmxUpdate(){
 }
 
 int patternZ[][4] = { // speed, acceleration, position
-                    {2,180, 50, maxTravelZ}, {2,120, 80, 0}, {2, 50, 50, maxTravelZ/2}, {2, 180, 80, 20}
+                    {2,120, 50, maxTravelZ}, {2,80, 80, 0}, {2, 50, 50, maxTravelZ/2}, {2, 100, 80, 20}
                   };
 int patternX[][4] = { // speed, acceleration, position
-                    {1, 80, 50, maxTravelX}, {1, 40, 80, 0}, {1, 50, 50, maxTravelX/2}, {1, 180, 80, 20}
+                    {1, 60, 50, maxTravelX}, {1, 40, 80, 0}, {1, 50, 50, maxTravelX/2}, {1, 60, 80, 20}
                   };
 
 // TODO: fade with acceleration
 // TODO: Dwell at end of travel
+// TODO: check limit switch
+
+void checkLimit(){
+  if(digitalRead(endstopZ) == false){
+    stepperZ.setCurrentPosition(0);
+    posZ = 0;
+  }
+  if(digitalRead(endstopX) == false){
+    stepperX.setCurrentPosition(0);
+    posX = 0;
+  }
+}
 
 void loop()
 {
  if(calibration == true){
    calibrateTravel();
  } else {
-
+   checkLimit();
+   //motorID,  speed, acceleration, position
    moveTo(patternZ[patternPosZ][0], patternZ[patternPosZ][1], patternZ[patternPosZ][2], patternZ[patternPosZ][3]);
-//   moveTo(patternX[patternPosX][0], patternX[patternPosX][1], patternX[patternPosX][2], patternX[patternPosX][3]);
+   moveTo(patternX[patternPosX][0], patternX[patternPosX][1], patternX[patternPosX][2], patternX[patternPosX][3]);
    if(stepperZ.distanceToGo() == 0){
      if(patternPosZ < 3){
        patternPosZ ++;
@@ -246,8 +264,10 @@ void loop()
      }
      stepperX.run();
      stepperZ.run();
-
-     if(stepperZ.distanceToGo() < 90){
+     //Serial.print("Z ToGO: ");
+     unsigned int travelLeftZ = abs(stepperZ.distanceToGo());
+//     Serial.println(travelLeftZ);
+     if(travelLeftZ < 200){
        dmxUpdate();
        dmxTarget(1,255);
        dmxTarget(2,255);
