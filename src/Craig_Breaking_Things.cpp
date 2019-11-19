@@ -23,30 +23,37 @@ AccelStepper stepperZ(stepTypeZ,stepPinZ,stepDirZ);
 
 //Config Settings
 //Max steps to travel from home position
-const int maxTravelX = 2800;
-const int maxTravelZ = 800; //900 steps = 180 degrees
+const int maxTravelX = 2600; // A: 2600 B: 1500
+const int maxTravelZ = 800; // A: 800 B: 700
+
+//Max crossfade time in millis
+unsigned int fadeSpeed = 5000;
 
 const boolean calibration = false;
 
 unsigned int posX, posZ;
-unsigned short patternPosZ, patternPosX = 0;
+unsigned short patternPosZ, patternPosX, patternPosDmx = 0;
 const int dmxChannels = 6;
 
-unsigned long time;
+unsigned long time, dwellTarget;
 long TravelX;
 int move_finished=1;
 long inital_homing=-1;
 int dur;
-boolean homedX = false;
+boolean homedX, dwell = false;
 
 void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋업
 {
   Serial.begin(9600);
-//  DmxSimple.maxChannel(dmxChannels);
+  //output setup
   DmxSimple.usePin(dmxPin);
-  DmxSimple.write(1, 255);
+
   pinMode(endstopX,INPUT_PULLUP);
   delay(5);
+  // Precalculate statics
+  fadeSpeed = fadeSpeed/255;
+  //Home X
+    DmxSimple.write(3, 255);
      stepperX.setAcceleration(100);
      stepperX.setMaxSpeed(100);
 
@@ -66,7 +73,10 @@ void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋
 
 
     Serial.println("HomingX... Complete!");
+    DmxSimple.write(3, 0);
 
+    //Home Z
+    DmxSimple.write(1, 255);
     inital_homing = -1;
     pinMode(endstopZ,INPUT_PULLUP);
     delay(5);
@@ -87,7 +97,15 @@ void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋
     stepperZ.setMaxSpeed(100);
     stepperZ.setAcceleration(100);
     Serial.println("HomingZ... Complete!");
-    delay(2000);
+    DmxSimple.write(1, 0);
+
+    //homing is finished, flash green
+    for(int x = 0; x < 5; x++){
+      DmxSimple.write(2, 255);
+      delay(200);
+      DmxSimple.write(2, 0);
+      delay(200);
+    }
   /*
   while (!digitalRead(endstop1)){
     stepperX.moveTo(initial_homing);
@@ -102,7 +120,7 @@ void setup() //endstop이 눌리면 그곳을 초기 home으로 설정하는 셋
 
   delay(1000);
   */
-  DmxSimple.write(1, 0);
+
 }
 
 void moveTo(short motorID, int speed, int acceleration, int targetPosition){
@@ -122,7 +140,6 @@ void calibrateTravel(){
   if(homedX == false){
     stepperX.run();
   }
-
 
   if(stepperX.distanceToGo() == 0 && homedX == false){
     stepperX.moveTo(posX + 500);
@@ -144,19 +161,17 @@ void calibrateTravel(){
 
     stepperZ.run();
   }
-    if(stepperZ.distanceToGo() == 0 && homedX == true){
-      stepperZ.moveTo(posZ + 100);
-      posZ += 100;
+  if(stepperZ.distanceToGo() == 0 && homedX == true){
+    stepperZ.moveTo(posZ + 100);
+    posZ += 100;
+  }
+  if(digitalRead(endstopZ) == 0 && homedX == true){
+    Serial.println("HALTING! Z --- END ");
+    Serial.println(posZ);
+    while(true){
+      // Calibration finished, Halt forever
     }
-    if(digitalRead(endstopZ) == 0 && homedX == true){
-      Serial.println("HALTING! Z --- END ");
-      Serial.println(posZ);
-      while(true){
-
-      }
-}
-
-
+  }
 }
 
 short dmxQue[][3] = { //[channel][current, target]
@@ -205,10 +220,6 @@ void dmxUpdate(){
         dmxQue[channelRefresh][1] ++;
       }
       DmxSimple.write(dmxQue[channelRefresh][0], dmxQue[channelRefresh][1]);
-  //    Serial.print("\t dmxUPdate - C:");
-  //    Serial.print(dmxQue[channelRefresh][0]);
-  //    Serial.print(" \t V:");
-  //    Serial.println(dmxQue[channelRefresh][1]);
     }
   }
 
@@ -216,15 +227,24 @@ void dmxUpdate(){
 }
 
 int patternZ[][4] = { // speed, acceleration, position
-                    {2,120, 50, maxTravelZ}, {2,80, 80, 0}, {2, 50, 50, maxTravelZ/2}, {2, 100, 80, 20}
+                    {2, 60, 50, maxTravelZ}, {2, 50, 80, 10}, {2, 20, 50, maxTravelZ/2}, {2, 45, 80, 20}
                   };
 int patternX[][4] = { // speed, acceleration, position
-                    {1, 60, 50, maxTravelX}, {1, 40, 80, 0}, {1, 50, 50, maxTravelX/2}, {1, 60, 80, 20}
+                    {1, 20, 50, maxTravelX}, {1, 13, 80, 10}, {1, 10, 50, maxTravelX/2}, {1, 30, 80, 20}
                   };
 
-// TODO: fade with acceleration
-// TODO: Dwell at end of travel
-// TODO: check limit switch
+int patternDmx[][5] = { //R, G, B, UV, Dwell time in millis
+                      {255, 255, 255, 0, 2000},
+                      {255, 255, 255, 0, 4000},
+                      {255, 255, 255, 0, 1000},
+                      {255, 255, 255, 0, 6000},
+                      {255, 255, 255, 0, 500},
+                      {255, 255, 255, 0, 1200}
+                      };
+
+// TODO: fade with acceleration -- DONE
+// TODO: Dwell at end of travel -- DONE
+// TODO: check limit switch -- DONE
 
 void checkLimit(){
   if(digitalRead(endstopZ) == false){
@@ -246,39 +266,54 @@ void loop()
    //motorID,  speed, acceleration, position
    moveTo(patternZ[patternPosZ][0], patternZ[patternPosZ][1], patternZ[patternPosZ][2], patternZ[patternPosZ][3]);
    moveTo(patternX[patternPosX][0], patternX[patternPosX][1], patternX[patternPosX][2], patternX[patternPosX][3]);
-   if(stepperZ.distanceToGo() == 0){
-     if(patternPosZ < 3){
-       patternPosZ ++;
-     } else {
-       //TODO:add call to homing function here
-       patternPosZ = 0;
-     }
-    }
-    if(stepperX.distanceToGo() == 0){
-      if(patternPosX < 3){ //length of pattern -1
-        patternPosX ++;
-      } else {
-        //TODO:add call to homing function here
-        patternPosX = 0;
+   if(stepperX.distanceToGo() == 0 && stepperZ.distanceToGo() == 0){
+     if(dwell == false){
+     dwellTarget = millis();
+     dwellTarget += patternDmx[patternPosDmx][4];
+     dwell = true;
+   }
+   if(millis() > dwellTarget){
+     dwell = false;
+     if(stepperZ.distanceToGo() == 0){
+       if(patternPosZ < 3){
+         patternPosZ ++;
+       } else {
+         //TODO:add call to homing function here
+         patternPosZ = 0;
+       }
       }
+      if(stepperX.distanceToGo() == 0){
+        if(patternPosX < 3){ //length of pattern -1
+          patternPosX ++;
+        } else {
+          //TODO:add call to homing function here
+          patternPosX = 0;
+        }
+       }
      }
+   }
      stepperX.run();
      stepperZ.run();
      //Serial.print("Z ToGO: ");
      unsigned int travelLeftZ = abs(stepperZ.distanceToGo());
 //     Serial.println(travelLeftZ);
      if(travelLeftZ < 200){
-       dmxUpdate();
+       //dmxUpdate();
        dmxTarget(1,255);
        dmxTarget(2,255);
        dmxTarget(3,255);
        dmxTarget(6,0);
      } else {
-       dmxUpdate();
+       //dmxUpdate();
        dmxTarget(1,0);
        dmxTarget(2,0);
        dmxTarget(3,0);
        dmxTarget(6,255);
+     }
+
+
+     if (millis() % fadeSpeed == 0) {
+       dmxUpdate();
      }
      /*
      stepperX.runToNewPosition(1000); //포지션 1000으로 이동 - 정확히 단위는 모르겠음
@@ -292,5 +327,6 @@ void loop()
      stepperX.setAcceleration(0.05);
      stepperX.runToNewPosition(-10);
      */
+     delay(1);
  }
 }
