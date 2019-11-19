@@ -27,6 +27,7 @@ void setup()
 {
   Serial.begin(9600);
   Serial.println(CompileDate);
+  delay(2000);
   //output setup
   DmxSimple.usePin(dmxPin);
   pinMode(endstopX,INPUT_PULLUP);
@@ -34,6 +35,7 @@ void setup()
   delay(5);
 
   homeAxis();
+  //moveTo(patternZ[patternPosZ][0], patternZ[patternPosZ][1], patternZ[patternPosZ][2], patternZ[patternPosZ][3]);
 
 }
 
@@ -46,7 +48,7 @@ void loop()
    //motorID,  speed, acceleration, position
    moveTo(patternZ[patternPosZ][0], patternZ[patternPosZ][1], patternZ[patternPosZ][2], patternZ[patternPosZ][3]);
    moveTo(patternX[patternPosX][0], patternX[patternPosX][1], patternX[patternPosX][2], patternX[patternPosX][3]);
-   if(stepperX.distanceToGo() == 0 && stepperZ.distanceToGo() == 0){
+   if(stepsRemain(1) == 0 && stepsRemain(2) == 0){
      if(dwell == false){
        dwellTarget = millis();
        dwellTarget += patternDmx[patternPosDmx][4];
@@ -54,27 +56,23 @@ void loop()
      }
      if(millis() > dwellTarget){
        dwell = false;
-//       if(stepperZ.distanceToGo() == 0){
          if(patternPosZ < 3){ //numper of patterns in array TODO: make this value dynamic
            patternPosZ ++;
          } else {
            patternPosZ = 0;
          }
-//        }
-//        if(stepperX.distanceToGo() == 0){
           if(patternPosX < 3){ //length of pattern -1 TODO: make this value dynamic
             patternPosX ++;
           } else {
             patternPosX = 0;
           }
-//         }
        }
+
    }
-     stepperX.run();
-     stepperZ.run();
+     stepperUpdate();
      //Serial.print("Z ToGO: ");
-     unsigned int travelLeftZ = abs(stepperZ.distanceToGo());
-//     Serial.println(travelLeftZ);
+     unsigned int travelLeftZ = abs(stepsRemain(2));
+     //Serial.println(travelLeftZ);
      if(travelLeftZ < 200){ //number of steps remaining when crossfade starts
        //dmxUpdate();
        dmxTarget(1,255);

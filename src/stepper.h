@@ -14,5 +14,7 @@ void homeAxis();
 void moveTo(short, int, int, int);
 void calibrateTravel();
 void checkLimit();
+void stepperUpdate();
+int stepsRemain(int id);
 
 #endif

@@ -119,3 +119,19 @@ void checkLimit(){
     stepperX.setCurrentPosition(0);
   }
 }
+
+void stepperUpdate()
+{
+  stepperX.run();
+  stepperZ.run();
+}
+
+int stepsRemain(int id)
+{
+  if(id == 1){
+    return stepperZ.distanceToGo();
+  } else {
+    return stepperZ.distanceToGo();
+  }
+
+}
